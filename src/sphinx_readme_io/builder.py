@@ -62,6 +62,9 @@ class ReadmeIOBuilder(MarkdownBuilder):
         self.current_doc_name = docname
         self.sec_numbers = self.env.toc_secnumbers.get(docname, {})
         
+        # Set docname in temp_data so it's accessible during writing
+        self.env.temp_data['docname'] = docname
+        
         # Generate markdown content using the parent writer
         destination = StringOutput(encoding="utf-8")
         self.writer.write(doctree, destination)

@@ -1,4 +1,9 @@
 {
 	"name": "Alpine",
-	"image": "mcr.microsoft.com/devcontainers/base:alpine-3.20"
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+	"features": {
+		"python": {
+			"version": "3.10"
+		}
+	}
 }

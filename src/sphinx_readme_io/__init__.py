@@ -31,16 +31,6 @@ def setup(app: Sphinx) -> dict:
     # Set to None to use defaults, or provide a custom set of field names
     app.add_config_value("readmeio_passthrough_fields", None, "env")
 
-    # Configuration options inherited from sphinx-markdown-builder
-    # These are needed because we extend MarkdownBuilder
-    app.add_config_value("markdown_http_base", "", "html", str)
-    app.add_config_value("markdown_uri_doc_suffix", ".md", "html", str)
-    app.add_config_value("markdown_file_suffix", ".md", "html", str)
-    app.add_config_value("markdown_anchor_sections", False, "html", bool)
-    app.add_config_value("markdown_anchor_signatures", False, "html", bool)
-    app.add_config_value("markdown_docinfo", False, "html", bool)
-    app.add_config_value("markdown_bullet", "*", "html", str)
-    app.add_config_value("markdown_flavor", "", "html", str)
 
     return {
         "version": __version__,
