@@ -16,7 +16,7 @@ from sphinx.util.osutil import ensuredir, os_path
 from sphinx_markdown_builder.builder import MarkdownBuilder, io_handler
 from sphinx_markdown_builder.writer import MarkdownWriter
 
-from sphinx_readme_io.transforms import transform_content
+from sphinx_readme_io.transforms import generate_slug, transform_content
 
 if TYPE_CHECKING:
     from sphinx.application import Sphinx
@@ -50,6 +50,33 @@ class ReadmeIOBuilder(MarkdownBuilder):
     def prepare_writing(self, docnames: Set[str]):
         """Prepare for writing documents."""
         self.writer = MarkdownWriter(self)
+        # Build a mapping of docname -> slug for link rewriting
+        self.slug_map = self._build_slug_map(docnames)
+    
+    def _build_slug_map(self, docnames: Set[str]) -> dict[str, str]:
+        """
+        Build a mapping from docname to final slug for all documents.
+        
+        This checks document metadata for explicit slug overrides,
+        falling back to auto-generated slugs.
+        """
+        slug_map = {}
+        for docname in docnames:
+            # Check for explicit slug in document metadata
+            explicit_slug = None
+            if hasattr(self.env, "metadata") and docname in self.env.metadata:
+                doc_metadata = self.env.metadata[docname]
+                # Check for readmeio-slug first (RST field list)
+                if "readmeio-slug" in doc_metadata:
+                    explicit_slug = doc_metadata["readmeio-slug"]
+                # Then check for direct slug field (MyST frontmatter)
+                elif "slug" in doc_metadata:
+                    explicit_slug = doc_metadata["slug"]
+            
+            # Use explicit slug or generate one
+            slug_map[docname] = explicit_slug if explicit_slug else generate_slug(docname)
+        
+        return slug_map
     
     def write_doc(self, docname: str, doctree: nodes.document):
         """
@@ -86,6 +113,7 @@ class ReadmeIOBuilder(MarkdownBuilder):
             strip_md_links=self.config.readmeio_strip_md_links,
             default_frontmatter=self.config.readmeio_default_frontmatter,
             passthrough_fields=passthrough_fields,
+            slug_map=self.slug_map,
         )
         
         # Write to output file

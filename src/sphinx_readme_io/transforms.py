@@ -299,6 +299,88 @@ def strip_md_extension_from_links(content: str) -> str:
     return re.sub(pattern, replace_link, content)
 
 
+def rewrite_relative_links_with_slugs(
+    content: str,
+    current_docname: str,
+    slug_map: dict[str, str],
+) -> str:
+    """
+    Rewrite relative markdown links to use the target document's slug.
+    
+    This resolves links based on the slug defined in each target document's
+    frontmatter, enabling custom URL slugs to work correctly in readme.io.
+    
+    Transforms:
+        [Link](auth.md) -> [Link](cli-auth)  (if auth.md has slug: cli-auth)
+        [Link](./api/ref.md#section) -> [Link](api-reference#section)
+    
+    Does not transform:
+        [Link](https://example.com/file.md) - external URLs
+        [Link](mailto:test@example.md) - non-http schemes
+    
+    Args:
+        content: The markdown content to transform
+        current_docname: The docname of the current document (for resolving relative paths)
+        slug_map: Mapping of docname -> slug for all documents
+    
+    Returns:
+        Transformed content with links rewritten to use slugs
+    """
+    import os.path
+    
+    def replace_link(match: re.Match) -> str:
+        text = match.group(1)
+        url = match.group(2)
+        
+        # Skip external URLs (http://, https://, mailto:, etc.)
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", url):
+            return match.group(0)
+        
+        # Skip non-.md links (images, etc.)
+        if not re.search(r"\.md(#|$)", url):
+            return match.group(0)
+        
+        # Parse the URL to extract path and anchor
+        anchor = ""
+        if "#" in url:
+            url_path, anchor = url.split("#", 1)
+            anchor = "#" + anchor
+        else:
+            url_path = url
+        
+        # Remove .md extension
+        if url_path.endswith(".md"):
+            url_path = url_path[:-3]
+        
+        # Resolve the target docname relative to current document
+        if url_path.startswith("./"):
+            url_path = url_path[2:]
+        
+        # Get the directory of the current document
+        current_dir = os.path.dirname(current_docname)
+        
+        # Resolve the target path relative to current document's directory
+        if current_dir:
+            target_docname = os.path.normpath(os.path.join(current_dir, url_path))
+        else:
+            target_docname = os.path.normpath(url_path)
+        
+        # Normalize path separators (Windows compatibility)
+        target_docname = target_docname.replace("\\", "/")
+        
+        # Look up the slug for the target document
+        if target_docname in slug_map:
+            slug = slug_map[target_docname]
+            return f"[{text}]({slug}{anchor})"
+        
+        # Fallback: just strip .md extension if target not in slug map
+        return f"[{text}]({url_path}{anchor})"
+    
+    # Match markdown links
+    pattern = r"\[([^\]]*)\]\(([^)]+)\)"
+    return re.sub(pattern, replace_link, content)
+
+
 def build_frontmatter_fields(
     doctree: nodes.document,
     docname: str,
@@ -384,6 +466,7 @@ def transform_content(
     strip_md_links: bool = True,
     default_frontmatter: dict[str, Any] | None = None,
     passthrough_fields: set[str] | None = None,
+    slug_map: dict[str, str] | None = None,
 ) -> str:
     """
     Transform markdown content for readme.io compatibility.
@@ -397,15 +480,20 @@ def transform_content(
         default_frontmatter: Default frontmatter fields (can be overridden per-document)
         passthrough_fields: Set of field names to pass through from document
             metadata (for MyST frontmatter support)
+        slug_map: Mapping of docname -> slug for link rewriting. If provided,
+            links will be rewritten to use the target document's slug.
     
     Returns:
         Transformed markdown content
     """
     result = content
     
-    # Strip .md from links
+    # Rewrite links: use slug map if provided, otherwise just strip .md
     if strip_md_links:
-        result = strip_md_extension_from_links(result)
+        if slug_map is not None:
+            result = rewrite_relative_links_with_slugs(result, docname, slug_map)
+        else:
+            result = strip_md_extension_from_links(result)
     
     # Add frontmatter
     if add_frontmatter:
