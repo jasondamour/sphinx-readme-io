@@ -4,6 +4,7 @@ Transformations for readme.io-compatible markdown output.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -123,11 +124,25 @@ def extract_document_metadata(
         Dictionary of metadata fields to use as frontmatter overrides
     """
     if passthrough_fields is None:
-        # Default fields that are commonly used in readme.io frontmatter
-        # These will be passed through directly if found in document metadata
+        # Fields that match the ReadMe API for guides/docs
+        # See: https://docs.readme.com/main/reference/createguide
         passthrough_fields = {
-            "title", "slug", "excerpt", "category", "hidden", "order",
-            "parentDoc", "parentDocSlug", "type", "api", "next", "previous",
+            # Required fields
+            "title",              # string, required
+            "category",           # object with uri
+            # Optional fields
+            "slug",               # string, URL slug for the page
+            "content",            # object with body, excerpt
+            "type",               # enum: api_config, basic, endpoint, link, webhook
+            "state",              # enum: current, deprecated
+            "position",           # number, ordering
+            "parent",             # object with uri
+            "next",               # object
+            "link",               # object for redirect pages
+            "metadata",           # object
+            "privacy",            # object
+            "appearance",         # object
+            "allow_crawlers",     # enum: enabled, disabled
         }
     
     metadata = {}
@@ -165,10 +180,16 @@ def _parse_metadata_value(value: str) -> Any:
         return float(value)
     except ValueError:
         pass
+    # Try to parse as JSON (for nested dicts/lists serialized as strings)
+    if value.startswith(("{", "[")):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            pass
     return value
 
 
-def format_yaml_value(value: Any) -> str:
+def format_yaml_value(value: Any, indent: int = 0) -> str:
     """Format a Python value for YAML output."""
     if isinstance(value, bool):
         return "true" if value else "false"
@@ -178,8 +199,39 @@ def format_yaml_value(value: Any) -> str:
         # Escape quotes and wrap in quotes
         escaped = value.replace('"', '\\"')
         return f'"{escaped}"'
+    if isinstance(value, dict):
+        # Return None to signal this needs block formatting
+        return None
+    if isinstance(value, list):
+        # Return None to signal this needs block formatting
+        return None
     # For other types, convert to string and quote
     return f'"{value}"'
+
+
+def _format_yaml_nested(value: Any, indent: int) -> list[str]:
+    """Format nested YAML structures (dicts and lists) as lines."""
+    lines = []
+    indent_str = "  " * indent
+    
+    if isinstance(value, dict):
+        for k, v in value.items():
+            if isinstance(v, (dict, list)):
+                lines.append(f"{indent_str}{k}:")
+                lines.extend(_format_yaml_nested(v, indent + 1))
+            else:
+                formatted = format_yaml_value(v)
+                lines.append(f"{indent_str}{k}: {formatted}")
+    elif isinstance(value, list):
+        for item in value:
+            if isinstance(item, (dict, list)):
+                lines.append(f"{indent_str}-")
+                lines.extend(_format_yaml_nested(item, indent + 1))
+            else:
+                formatted = format_yaml_value(item)
+                lines.append(f"{indent_str}- {formatted}")
+    
+    return lines
 
 
 def generate_frontmatter(fields: dict[str, Any]) -> str:
@@ -198,8 +250,14 @@ def generate_frontmatter(fields: dict[str, Any]) -> str:
     for key, value in fields.items():
         if value is None:
             continue
-        formatted_value = format_yaml_value(value)
-        lines.append(f"{key}: {formatted_value}")
+        
+        if isinstance(value, (dict, list)):
+            # Handle nested structures
+            lines.append(f"{key}:")
+            lines.extend(_format_yaml_nested(value, 1))
+        else:
+            formatted_value = format_yaml_value(value)
+            lines.append(f"{key}: {formatted_value}")
     
     lines.append("---")
     lines.append("")  # Empty line after frontmatter
@@ -283,17 +341,39 @@ def build_frontmatter_fields(
     if auto_slug:
         fields["slug"] = generate_slug(docname)
     if auto_excerpt:
-        fields["excerpt"] = extract_excerpt(content)
+        # ReadMe API expects excerpt inside content object
+        excerpt = extract_excerpt(content)
+        if excerpt:
+            fields["content"] = {"excerpt": excerpt}
     
     # Layer 2: Default frontmatter from config
     if default_frontmatter:
-        fields.update(default_frontmatter)
+        _deep_merge(fields, default_frontmatter)
     
     # Layer 3: Per-document metadata (highest precedence)
     doc_metadata = extract_document_metadata(doctree, passthrough_fields)
-    fields.update(doc_metadata)
+    _deep_merge(fields, doc_metadata)
     
     return fields
+
+
+def _deep_merge(base: dict, override: dict) -> None:
+    """
+    Deep merge override dict into base dict.
+    
+    For nested dicts, merges recursively instead of replacing.
+    This allows content.excerpt from doc to override auto-generated content.excerpt
+    while preserving other content fields.
+    """
+    for key, value in override.items():
+        if (
+            key in base
+            and isinstance(base[key], dict)
+            and isinstance(value, dict)
+        ):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
 
 
 def transform_content(
