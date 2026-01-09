@@ -89,7 +89,12 @@ class ReadmeIOBuilder(MarkdownBuilder):
         )
         
         # Write to output file
-        out_filename = os.path.join(self.outdir, f"{os_path(docname)}{self.out_suffix}")
+        # Rename index.md to 00_index.md so it's created first when rdme runs alphabetically
+        output_docname = os_path(docname)
+        dirname, basename = os.path.split(output_docname)
+        if basename == "index":
+            output_docname = os.path.join(dirname, "00_index") if dirname else "00_index"
+        out_filename = os.path.join(self.outdir, f"{output_docname}{self.out_suffix}")
         ensuredir(os.path.dirname(out_filename))
         
         with io_handler(out_filename):
