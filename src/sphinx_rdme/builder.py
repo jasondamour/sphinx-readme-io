@@ -7,17 +7,6 @@ from __future__ import annotations
 import os
 import sys
 from typing import TYPE_CHECKING, Callable, ClassVar, TypeVar
-
-_F = TypeVar("_F", bound=Callable[..., object])
-
-if sys.version_info >= (3, 12):
-    from typing import override
-else:
-
-    def override(func: _F) -> _F:  # noqa: D103
-        return func
-
-
 from docutils import nodes
 from docutils.io import StringOutput
 from sphinx.locale import __
@@ -34,6 +23,15 @@ if TYPE_CHECKING:
     from sphinx.environment import BuildEnvironment
 
 logger = logging.getLogger(__name__)
+
+_F = TypeVar("_F", bound=Callable[..., object])
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+
+    def override(func: _F) -> _F:  # noqa: D103
+        return func
 
 
 class rdmeBuilder(MarkdownBuilder):

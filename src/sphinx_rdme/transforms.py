@@ -191,7 +191,7 @@ def _parse_metadata_value(value: str) -> Any:
 
 def format_yaml_value(value: Any) -> str | None:
     """Format a Python value for YAML output.
-    
+
     Returns None for dicts and lists to signal they need block formatting.
     """
     if isinstance(value, bool):
