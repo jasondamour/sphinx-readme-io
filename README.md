@@ -1,11 +1,11 @@
-# sphinx-readme-io
+# sphinx-rdme
 
-A Sphinx extension to build documentation compatible with [readme.io](https://readme.com/).
+A Sphinx extension to build documentation compatible with [readme.io](https://readme.io/) via the [rdme cli](https://github.com/readmeio/rdme/).
 
 ## Features
 
 - Generates Markdown files with YAML frontmatter
-- Strips `.md` extensions from relative links (readme.io resolves links without extensions)
+- Strips `.md` extensions from relative links (rdme resolves links without extensions)
 - Extracts page titles and slugs automatically
 - Flexible frontmatter with configurable defaults and per-document overrides
 - Supports [MyST Parser](https://myst-parser.readthedocs.io/) YAML frontmatter
@@ -14,13 +14,13 @@ A Sphinx extension to build documentation compatible with [readme.io](https://re
 ## Installation
 
 ```bash
-pip install sphinx-readme-io
+pip install sphinx-rdme
 ```
 
 Or with uv:
 
 ```bash
-uv add sphinx-readme-io
+uv add sphinx-rdme
 ```
 
 ## Usage
@@ -30,20 +30,20 @@ Add the extension to your `conf.py`:
 ```python
 extensions = [
     # ... other extensions ...
-    "sphinx_readme_io",
+    "sphinx_rdme",
 ]
 ```
 
 Build your documentation:
 
 ```bash
-sphinx-build -M readmeio ./docs ./build
+sphinx-build -M rdme ./docs ./build
 ```
 
 Or using the builder directly:
 
 ```bash
-sphinx-build -b readmeio ./docs ./build/readmeio
+sphinx-build -b rdme ./docs ./build/rdme
 ```
 
 ## Configuration
@@ -52,10 +52,10 @@ Add these options to your `conf.py`:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `readmeio_frontmatter` | `True` | Enable/disable YAML frontmatter generation |
-| `readmeio_strip_md_links` | `True` | Strip `.md` extension from relative links |
-| `readmeio_default_frontmatter` | `{}` | Default frontmatter fields (dict) |
-| `readmeio_passthrough_fields` | `None` | Fields to pass through from document metadata |
+| `rdme_frontmatter` | `True` | Enable/disable YAML frontmatter generation |
+| `rdme_strip_md_links` | `True` | Strip `.md` extension from relative links |
+| `rdme_default_frontmatter` | `{}` | Default frontmatter fields (dict) |
+| `rdme_passthrough_fields` | `None` | Fields to pass through from document metadata |
 
 ### Default Frontmatter
 
@@ -63,7 +63,7 @@ You can set default frontmatter fields that apply to all documents:
 
 ```python
 # conf.py
-readmeio_default_frontmatter = {
+rdme_default_frontmatter = {
     "category": "guides",
     "hidden": False,
     "order": 1,
@@ -71,11 +71,11 @@ readmeio_default_frontmatter = {
 }
 ```
 
-This can include **any key/value pairs** - not just readme.io standard fields. The defaults can also override auto-generated fields like `title`, `slug`, and `excerpt`:
+This can include **any key/value pairs** - not just rdme standard fields. The defaults can also override auto-generated fields like `title`, `slug`, and `excerpt`:
 
 ```python
 # Override auto-generated excerpt for all pages
-readmeio_default_frontmatter = {
+rdme_default_frontmatter = {
     "excerpt": "Official documentation",
 }
 ```
@@ -84,12 +84,12 @@ readmeio_default_frontmatter = {
 
 #### Option 1: RST Field Lists
 
-For RST sources, use field lists with the `readmeio-` prefix:
+For RST sources, use field lists with the `rdme-` prefix:
 
 ```rst
-:readmeio-hidden: true
-:readmeio-category: advanced
-:readmeio-custom-field: custom-value
+:rdme-hidden: true
+:rdme-category: advanced
+:rdme-custom-field: custom-value
 
 My Document Title
 =================
@@ -122,7 +122,7 @@ To customize which fields are passed through:
 
 ```python
 # conf.py
-readmeio_passthrough_fields = {
+rdme_passthrough_fields = {
     "title", "slug", "hidden", "category", "my_custom_field"
 }
 ```
@@ -131,8 +131,8 @@ readmeio_passthrough_fields = {
 
 Frontmatter values are resolved in this order (highest to lowest priority):
 
-1. **Per-document metadata** (RST `:readmeio-*:` fields or MyST frontmatter)
-2. **Default frontmatter** (`readmeio_default_frontmatter` config)
+1. **Per-document metadata** (RST `:rdme-*:` fields or MyST frontmatter)
+2. **Default frontmatter** (`rdme_default_frontmatter` config)
 3. **Auto-generated values** (title, slug, excerpt)
 
 ## Output Format

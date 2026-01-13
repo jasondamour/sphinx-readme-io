@@ -1,24 +1,24 @@
 """
-Tests for sphinx-readme-io builder.
+Tests for sphinx-rdme builder.
 """
 
-import pytest
-from docutils import nodes
+from typing import Any
+
 from docutils.parsers.rst import Parser
 from docutils.utils import new_document
 from docutils.frontend import OptionParser
 
-from sphinx_readme_io.transforms import (
-    extract_title,
-    generate_slug,
-    extract_excerpt,
-    generate_frontmatter,
-    format_yaml_value,
+from sphinx_rdme.transforms import (
+    _parse_metadata_value,  # pyright: ignore[reportPrivateUsage]
     build_frontmatter_fields,
     extract_document_metadata,
+    extract_excerpt,
+    extract_title,
+    format_yaml_value,
+    generate_frontmatter,
+    generate_slug,
     strip_md_extension_from_links,
     transform_content,
-    _parse_metadata_value,
 )
 
 
@@ -27,19 +27,17 @@ class TestExtractTitle:
 
     def test_fallback_to_docname(self):
         """Test that docname is used when no title in document."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         result = extract_title(doc, "my-document")
         assert result == "My Document"
 
     def test_fallback_with_path(self):
         """Test that path separators are handled in docname fallback."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         result = extract_title(doc, "api/index")
         assert result == "Api Index"
 
@@ -94,6 +92,7 @@ class TestExtractExcerpt:
         long_text = "This is a very long paragraph. " * 20
         content = f"# Title\n\n{long_text}"
         result = extract_excerpt(content, max_length=50)
+        assert result is not None
         assert len(result) <= 53  # 50 + "..."
         assert result.endswith("...")
 
@@ -164,66 +163,57 @@ class TestGenerateFrontmatter:
     def test_basic_frontmatter(self):
         """Test basic frontmatter generation."""
         result = generate_frontmatter({"title": "My Title", "slug": "my-slug"})
-        assert '---' in result
+        assert "---" in result
         assert 'title: "My Title"' in result
         assert 'slug: "my-slug"' in result
 
     def test_with_excerpt(self):
         """Test frontmatter with excerpt."""
-        result = generate_frontmatter({
-            "title": "Title",
-            "slug": "slug",
-            "excerpt": "Some description"
-        })
+        result = generate_frontmatter(
+            {"title": "Title", "slug": "slug", "excerpt": "Some description"}
+        )
         assert 'excerpt: "Some description"' in result
 
     def test_with_category(self):
         """Test frontmatter with category."""
-        result = generate_frontmatter({
-            "title": "Title",
-            "slug": "slug",
-            "category": "guides"
-        })
+        result = generate_frontmatter(
+            {"title": "Title", "slug": "slug", "category": "guides"}
+        )
         assert 'category: "guides"' in result
 
     def test_hidden_flag(self):
         """Test frontmatter with hidden flag."""
-        result = generate_frontmatter({
-            "title": "Title",
-            "slug": "slug",
-            "hidden": True
-        })
+        result = generate_frontmatter(
+            {"title": "Title", "slug": "slug", "hidden": True}
+        )
         assert "hidden: true" in result
 
     def test_escapes_quotes(self):
         """Test that quotes in values are escaped."""
-        result = generate_frontmatter({
-            "title": "Title",
-            "slug": "slug",
-            "excerpt": 'Say "hello"'
-        })
+        result = generate_frontmatter(
+            {"title": "Title", "slug": "slug", "excerpt": 'Say "hello"'}
+        )
         assert 'excerpt: "Say \\"hello\\""' in result
 
     def test_skips_none_values(self):
         """Test that None values are skipped."""
-        result = generate_frontmatter({
-            "title": "Title",
-            "slug": "slug",
-            "excerpt": None,
-            "category": None
-        })
+        result = generate_frontmatter(
+            {"title": "Title", "slug": "slug", "excerpt": None, "category": None}
+        )
         assert "excerpt" not in result
         assert "category" not in result
 
     def test_arbitrary_fields(self):
         """Test that arbitrary fields are included."""
-        result = generate_frontmatter({
-            "title": "Title",
-            "slug": "slug",
-            "custom_field": "custom_value",
-            "order": 5,
-            "featured": True
-        })
+        result = generate_frontmatter(
+            {
+                "title": "Title",
+                "slug": "slug",
+                "custom_field": "custom_value",
+                "order": 5,
+                "featured": True,
+            }
+        )
         assert 'custom_field: "custom_value"' in result
         assert "order: 5" in result
         assert "featured: true" in result
@@ -231,22 +221,26 @@ class TestGenerateFrontmatter:
 
 class MockEnv:
     """Mock Sphinx environment for testing document metadata extraction."""
-    
-    def __init__(self, docname: str, metadata: dict):
+
+    docname: str
+    metadata: dict[str, dict[str, Any]]
+
+    def __init__(self, docname: str, metadata: dict[str, Any]) -> None:
         self.docname = docname
         self.metadata = {docname: metadata}
 
 
 class MockSettings:
     """Mock document settings with environment."""
-    
-    def __init__(self, env: MockEnv):
+
+    env: MockEnv
+
+    def __init__(self, env: MockEnv) -> None:
         self.env = env
 
 
-def create_doc_with_metadata(docname: str, metadata: dict):
+def create_doc_with_metadata(docname: str, metadata: dict[str, Any]) -> Any:
     """Create a document with mock metadata (simulating MyST frontmatter)."""
-    parser = Parser()
     settings = OptionParser(components=(Parser,)).get_default_values()
     doc = new_document("test", settings)
     # Attach mock environment with metadata
@@ -257,31 +251,37 @@ def create_doc_with_metadata(docname: str, metadata: dict):
 class TestExtractDocumentMetadata:
     """Tests for extract_document_metadata function (passthrough frontmatter)."""
 
-    def test_extracts_readmeio_prefixed_fields(self):
-        """Test that readmeio- prefixed fields are extracted."""
-        doc = create_doc_with_metadata("test-doc", {
-            "readmeio-hidden": "true",
-            "readmeio-category": "guides",
-            "readmeio-order": "5",
-        })
-        
+    def test_extracts_rdme_prefixed_fields(self):
+        """Test that rdme- prefixed fields are extracted."""
+        doc = create_doc_with_metadata(
+            "test-doc",
+            {
+                "rdme-hidden": "true",
+                "rdme-category": "guides",
+                "rdme-order": "5",
+            },
+        )
+
         result = extract_document_metadata(doc)
-        
+
         assert result["hidden"] is True
         assert result["category"] == "guides"
         assert result["order"] == 5
 
     def test_extracts_passthrough_fields(self):
         """Test that default passthrough fields are extracted (MyST frontmatter)."""
-        doc = create_doc_with_metadata("test-doc", {
-            "title": "Custom Title",
-            "hidden": True,
-            "category": "advanced",
-            "order": 10,
-        })
-        
+        doc = create_doc_with_metadata(
+            "test-doc",
+            {
+                "title": "Custom Title",
+                "hidden": True,
+                "category": "advanced",
+                "order": 10,
+            },
+        )
+
         result = extract_document_metadata(doc)
-        
+
         assert result["title"] == "Custom Title"
         assert result["hidden"] is True
         assert result["category"] == "advanced"
@@ -289,88 +289,104 @@ class TestExtractDocumentMetadata:
 
     def test_custom_passthrough_fields(self):
         """Test that custom passthrough fields can be specified."""
-        doc = create_doc_with_metadata("test-doc", {
-            "my_custom_field": "custom_value",
-            "another_field": "another_value",
-            "ignored_field": "should not appear",
-        })
-        
+        doc = create_doc_with_metadata(
+            "test-doc",
+            {
+                "my_custom_field": "custom_value",
+                "another_field": "another_value",
+                "ignored_field": "should not appear",
+            },
+        )
+
         # Only pass through specific fields
         result = extract_document_metadata(
-            doc, 
-            passthrough_fields={"my_custom_field", "another_field"}
+            doc, passthrough_fields={"my_custom_field", "another_field"}
         )
-        
+
         assert result["my_custom_field"] == "custom_value"
         assert result["another_field"] == "another_value"
         assert "ignored_field" not in result
 
     def test_passthrough_parses_string_booleans(self):
         """Test that string boolean values are parsed correctly."""
-        doc = create_doc_with_metadata("test-doc", {
-            "hidden": "true",
-            # Use a custom passthrough set to test the "featured" field
-        })
-        
+        doc = create_doc_with_metadata(
+            "test-doc",
+            {
+                "hidden": "true",
+                # Use a custom passthrough set to test the "featured" field
+            },
+        )
+
         result = extract_document_metadata(doc)
         assert result["hidden"] is True
-        
+
         # Test with custom passthrough to verify string parsing
-        doc2 = create_doc_with_metadata("test-doc", {
-            "featured": "false",
-        })
+        doc2 = create_doc_with_metadata(
+            "test-doc",
+            {
+                "featured": "false",
+            },
+        )
         result2 = extract_document_metadata(doc2, passthrough_fields={"featured"})
         assert result2["featured"] is False
 
     def test_passthrough_preserves_native_types(self):
         """Test that native Python types are preserved (MyST Parser behavior)."""
-        doc = create_doc_with_metadata("test-doc", {
-            "hidden": True,  # Native bool, not string
-            "order": 5,      # Native int, not string
-        })
-        
+        doc = create_doc_with_metadata(
+            "test-doc",
+            {
+                "hidden": True,  # Native bool, not string
+                "order": 5,  # Native int, not string
+            },
+        )
+
         result = extract_document_metadata(doc)
-        
+
         assert result["hidden"] is True
         assert isinstance(result["hidden"], bool)
         assert result["order"] == 5
         assert isinstance(result["order"], int)
 
-    def test_readmeio_prefix_takes_precedence(self):
-        """Test that readmeio- prefixed fields override passthrough fields."""
-        doc = create_doc_with_metadata("test-doc", {
-            "category": "from-passthrough",
-            "readmeio-category": "from-prefix",
-        })
-        
+    def test_rdme_prefix_takes_precedence(self):
+        """Test that rdme- prefixed fields override passthrough fields."""
+        doc = create_doc_with_metadata(
+            "test-doc",
+            {
+                "category": "from-passthrough",
+                "rdme-category": "from-prefix",
+            },
+        )
+
         result = extract_document_metadata(doc)
-        
-        # readmeio- prefix should override since it's processed after
+
+        # rdme- prefix should override since it's processed after
         assert result["category"] == "from-prefix"
 
     def test_empty_passthrough_fields_set(self):
-        """Test that empty passthrough set only extracts readmeio- prefixed fields."""
-        doc = create_doc_with_metadata("test-doc", {
-            "title": "Should be ignored",
-            "category": "Also ignored",
-            "readmeio-hidden": "true",
-        })
-        
+        """Test that empty passthrough set only extracts rdme- prefixed fields."""
+        doc = create_doc_with_metadata(
+            "test-doc",
+            {
+                "title": "Should be ignored",
+                "category": "Also ignored",
+                "rdme-hidden": "true",
+            },
+        )
+
         result = extract_document_metadata(doc, passthrough_fields=set())
-        
+
         assert "title" not in result
         assert "category" not in result
         assert result["hidden"] is True
 
     def test_no_metadata_returns_empty_dict(self):
         """Test that missing metadata returns empty dict."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
         # No env attached
-        
+
         result = extract_document_metadata(doc)
-        
+
         assert result == {}
 
 
@@ -379,27 +395,25 @@ class TestBuildFrontmatterFields:
 
     def test_auto_generates_fields(self):
         """Test that fields are auto-generated."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         content = "# My Title\n\nSome content here."
         result = build_frontmatter_fields(
             doctree=doc,
             docname="my-doc",
             content=content,
         )
-        
+
         assert result["title"] == "My Doc"  # Falls back to docname
         assert result["slug"] == "my-doc"
-        assert result["excerpt"] == "Some content here."
+        assert result["content"]["excerpt"] == "Some content here."
 
     def test_default_frontmatter_overrides_auto(self):
         """Test that default frontmatter overrides auto-generated values."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         content = "# My Title\n\nSome content."
         result = build_frontmatter_fields(
             doctree=doc,
@@ -409,9 +423,9 @@ class TestBuildFrontmatterFields:
                 "title": "Custom Title",
                 "category": "guides",
                 "hidden": False,
-            }
+            },
         )
-        
+
         assert result["title"] == "Custom Title"  # Overridden
         assert result["slug"] == "my-doc"  # Auto-generated
         assert result["category"] == "guides"  # From defaults
@@ -419,10 +433,9 @@ class TestBuildFrontmatterFields:
 
     def test_can_disable_auto_fields(self):
         """Test that auto-generation can be disabled."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         content = "# My Title\n\nSome content."
         result = build_frontmatter_fields(
             doctree=doc,
@@ -431,7 +444,7 @@ class TestBuildFrontmatterFields:
             auto_title=False,
             auto_excerpt=False,
         )
-        
+
         assert "title" not in result
         assert result["slug"] == "my-doc"
         assert "excerpt" not in result
@@ -488,10 +501,9 @@ class TestTransformContent:
 
     def test_full_transform(self):
         """Test full content transformation."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         content = "# My Doc\n\nSome content with [link](other.md)."
         result = transform_content(
             content=content,
@@ -500,7 +512,7 @@ class TestTransformContent:
             add_frontmatter=True,
             strip_md_links=True,
         )
-        
+
         assert result.startswith("---")
         assert 'title: "My Doc"' in result
         assert 'slug: "my-doc"' in result
@@ -509,10 +521,9 @@ class TestTransformContent:
 
     def test_without_frontmatter(self):
         """Test transformation without frontmatter."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         content = "# My Doc\n\nContent."
         result = transform_content(
             content=content,
@@ -521,16 +532,15 @@ class TestTransformContent:
             add_frontmatter=False,
             strip_md_links=True,
         )
-        
+
         assert not result.startswith("---")
         assert "# My Doc" in result
 
     def test_without_link_stripping(self):
         """Test transformation without link stripping."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         content = "# My Doc\n\nSee [link](other.md)."
         result = transform_content(
             content=content,
@@ -539,15 +549,14 @@ class TestTransformContent:
             add_frontmatter=False,
             strip_md_links=False,
         )
-        
+
         assert "[link](other.md)" in result
 
     def test_with_default_frontmatter(self):
         """Test transformation with default frontmatter."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         content = "# My Doc\n\nSome content."
         result = transform_content(
             content=content,
@@ -559,9 +568,9 @@ class TestTransformContent:
                 "category": "guides",
                 "hidden": False,
                 "order": 1,
-            }
+            },
         )
-        
+
         assert result.startswith("---")
         assert 'category: "guides"' in result
         assert "hidden: false" in result
@@ -569,10 +578,9 @@ class TestTransformContent:
 
     def test_default_frontmatter_can_override_auto(self):
         """Test that default frontmatter can override auto-generated values."""
-        parser = Parser()
         settings = OptionParser(components=(Parser,)).get_default_values()
         doc = new_document("test", settings)
-        
+
         content = "# My Doc\n\nSome content."
         result = transform_content(
             content=content,
@@ -583,22 +591,25 @@ class TestTransformContent:
             default_frontmatter={
                 "title": "Overridden Title",
                 "slug": "custom-slug",
-            }
+            },
         )
-        
+
         assert 'title: "Overridden Title"' in result
         assert 'slug: "custom-slug"' in result
 
     def test_with_myst_style_frontmatter(self):
         """Test transformation with MyST-style YAML frontmatter passthrough."""
         # Simulate a document with MyST frontmatter metadata
-        doc = create_doc_with_metadata("my-doc", {
-            "title": "MyST Custom Title",
-            "hidden": True,
-            "category": "tutorials",
-            "order": 3,
-        })
-        
+        doc = create_doc_with_metadata(
+            "my-doc",
+            {
+                "title": "MyST Custom Title",
+                "hidden": True,
+                "category": "tutorials",
+                "order": 3,
+            },
+        )
+
         content = "# My Doc\n\nSome content."
         result = transform_content(
             content=content,
@@ -607,7 +618,7 @@ class TestTransformContent:
             add_frontmatter=True,
             strip_md_links=True,
         )
-        
+
         assert result.startswith("---")
         # Document metadata should override auto-generated title
         assert 'title: "MyST Custom Title"' in result
@@ -617,11 +628,14 @@ class TestTransformContent:
 
     def test_myst_frontmatter_overrides_defaults(self):
         """Test that per-document MyST frontmatter overrides config defaults."""
-        doc = create_doc_with_metadata("my-doc", {
-            "category": "from-document",
-            "hidden": True,
-        })
-        
+        doc = create_doc_with_metadata(
+            "my-doc",
+            {
+                "category": "from-document",
+                "hidden": True,
+            },
+        )
+
         content = "# My Doc\n\nSome content."
         result = transform_content(
             content=content,
@@ -633,9 +647,9 @@ class TestTransformContent:
                 "category": "from-defaults",
                 "hidden": False,
                 "author": "Default Author",
-            }
+            },
         )
-        
+
         # Document metadata takes precedence over defaults
         assert 'category: "from-document"' in result
         assert "hidden: true" in result
@@ -644,11 +658,14 @@ class TestTransformContent:
 
     def test_custom_passthrough_fields_in_transform(self):
         """Test custom passthrough fields in full transformation."""
-        doc = create_doc_with_metadata("my-doc", {
-            "my_custom": "value",
-            "title": "Should Be Ignored",  # Not in custom passthrough
-        })
-        
+        doc = create_doc_with_metadata(
+            "my-doc",
+            {
+                "my_custom": "value",
+                "title": "Should Be Ignored",  # Not in custom passthrough
+            },
+        )
+
         content = "# My Doc\n\nSome content."
         result = transform_content(
             content=content,
@@ -658,7 +675,7 @@ class TestTransformContent:
             strip_md_links=True,
             passthrough_fields={"my_custom"},  # Only pass through this field
         )
-        
+
         assert 'my_custom: "value"' in result
         # Title should be auto-generated since it's not in passthrough
         assert 'title: "My Doc"' in result

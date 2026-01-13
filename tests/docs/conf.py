@@ -12,7 +12,7 @@ author = "Test Author"
 
 # -- General configuration ---------------------------------------------------
 extensions = [
-    "sphinx_readme_io",
+    "sphinx_rdme",
 ]
 
 # Templates path
@@ -21,10 +21,10 @@ templates_path = ["_templates"]
 # Patterns to exclude
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-# -- Options for sphinx-readme-io --------------------------------------------
-readmeio_frontmatter = True
-readmeio_strip_md_links = True
-readmeio_default_frontmatter = {
+# -- Options for sphinx-rdme --------------------------------------------
+rdme_frontmatter = True
+rdme_strip_md_links = True
+rdme_default_frontmatter = {
     "category": "documentation",
     "hidden": False,
     "type": "basic",
