@@ -1,0 +1,25 @@
+dryRun: false
+debug: true
+
+branches:
+  - name: main
+
+# Order matters
+plugins:
+  - "@semantic-release/commit-analyzer"
+
+  - "@semantic-release/release-notes-generator"
+
+  - "@semantic-release/changelog"
+
+  - - "@semantic-release/exec"
+    - prepareCommand: uv version ${nextRelease.version}
+
+  - - "@semantic-release/git"
+    - message: 'chore(release): ${nextRelease.version} \n\n${nextRelease.notes}'
+      assets:
+        - CHANGELOG.md
+        - pyproject.toml
+        - uv.lock
+
+  - "@semantic-release/github"
